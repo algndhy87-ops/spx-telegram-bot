@@ -1,13 +1,18 @@
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 from PIL import Image, ImageDraw
-from datetime import datetime
-import os
 
 TOKEN = "8504745697:AAGMg6pK0tmySvZ589xESqQBhPCarOFfcP4"
 
 trades = []
 
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📊 SPX Contracts Bot\n\n"
@@ -15,11 +20,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/report - Daily report"
     )
 
+# /trade
 async def trade(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     context.user_data["step"] = 1
     await update.message.reply_text("Type: CALL or PUT")
 
+# handle steps
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get("step", 0)
     text = update.message.text
@@ -50,19 +57,18 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             trades.append({
                 "type": context.user_data["type"],
-                "entry": entry,
-                "high": high,
-                "contracts": contracts,
                 "pnl": pnl,
                 "status": status
             })
 
             context.user_data.clear()
-            await update.message.reply_text(f"✅ Trade saved\nPnL: {pnl:.2f}$ ({status})")
-
+            await update.message.reply_text(
+                f"✅ Trade saved\nPnL: {pnl:.2f}$ ({status})"
+            )
     except:
         await update.message.reply_text("❌ Invalid input, try again")
 
+# generate report image
 def generate_report():
     img = Image.new("RGB", (900, 600), "#0b3d2e")
     d = ImageDraw.Draw(img)
@@ -84,14 +90,10 @@ def generate_report():
     d.text((20, 230), f"Total Loss: {loss:.2f}$", fill="red")
     d.text((20, 260), f"Net P/L: {net:.2f}$", fill="gold")
 
-    y = 320
-    for t in trades[-5:]:
-        d.text((20, y), f"{t['type']} | {t['pnl']:.2f}$ | {t['status']}", fill="white")
-        y += 30
-
     img.save("report.png")
     return "report.png"
 
+# /report
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not trades:
         await update.message.reply_text("No trades today")
@@ -100,7 +102,8 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     img = generate_report()
     await update.message.reply_photo(photo=open(img, "rb"))
 
-app = ApplicationBuilder().token(TOKEN).build()
+# main
+app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("trade", trade))
